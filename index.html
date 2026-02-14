@@ -364,13 +364,21 @@
             <!-- View Records Section -->
             <div class="card">
                 <h2>📊 Waste Collection Records</h2>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
                     <p style="color: #6b7280;">Total Records: <strong id="recordCount">0</strong></p>
-                    <button onclick="loadRecords()" class="btn btn-primary">Refresh Records</button>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="testContract()" class="btn btn-primary">Test Contract</button>
+                        <button onclick="loadRecords()" class="btn btn-primary">Refresh Records</button>
+                    </div>
                 </div>
                 
                 <div id="recordsContainer">
-                    <div class="loading">Loading records...</div>
+                    <div class="info-box">
+                        <strong>🔍 Getting Started</strong><br>
+                        1. First, click "<strong>Test Contract</strong>" to verify your connection<br>
+                        2. Then click "<strong>Refresh Records</strong>" to load any existing records<br><br>
+                        <em>Make sure your MetaMask is connected to the same network where you deployed the contract.</em>
+                    </div>
                 </div>
             </div>
         </div>
@@ -595,7 +603,7 @@
             }
         ];
 
-        // ⚠️ REPLACE THIS WITH YOUR DEPLOYED CONTRACT ADDRESS
+        // ✅ Contract Address - Update this if you redeploy
         const CONTRACT_ADDRESS = "0xa6165bbb69f7e8f3d960220B5F28e990ea5F630D";
 
         let web3;
@@ -667,6 +675,28 @@
                 }
             } catch (error) {
                 console.error('Error checking role:', error);
+                alert('Error connecting to contract. Please verify:\n1. Contract address is correct\n2. You\'re on the right network\n3. Contract is deployed');
+            }
+        }
+
+        async function testContractConnection() {
+            try {
+                console.log('Testing contract connection...');
+                console.log('Contract address:', CONTRACT_ADDRESS);
+                console.log('Current account:', currentAccount);
+                
+                // Test admin call
+                const admin = await contract.methods.admin().call();
+                console.log('Admin address:', admin);
+                
+                // Test getRecordCount
+                const count = await contract.methods.getRecordCount().call();
+                console.log('Record count:', count);
+                
+                return true;
+            } catch (error) {
+                console.error('Contract connection test failed:', error);
+                return false;
             }
         }
 
@@ -745,63 +775,192 @@
             }
         }
 
-        async function loadRecords() {
+        async function testContract() {
+            const recordsContainer = document.getElementById('recordsContainer');
+            recordsContainer.innerHTML = '<div class="loading">Testing contract connection...</div>';
+            
             try {
-                const count = await contract.methods.getRecordCount().call();
-                document.getElementById('recordCount').textContent = count;
-
-                const recordsContainer = document.getElementById('recordsContainer');
+                console.log('=== Contract Test Started ===');
+                console.log('Contract Address:', CONTRACT_ADDRESS);
+                console.log('Current Account:', currentAccount);
                 
-                if (count == 0) {
-                    recordsContainer.innerHTML = '<div class="loading">No records found</div>';
+                // Test 1: Check if contract exists
+                const code = await web3.eth.getCode(CONTRACT_ADDRESS);
+                console.log('Contract code exists:', code !== '0x');
+                
+                if (code === '0x') {
+                    recordsContainer.innerHTML = `
+                        <div class="error">
+                            <strong>❌ Contract Not Found</strong><br><br>
+                            The contract address <code>${CONTRACT_ADDRESS}</code> does not have any deployed code.<br><br>
+                            <strong>Solutions:</strong><br>
+                            1. Verify the contract address is correct<br>
+                            2. Make sure you're on the correct network in MetaMask<br>
+                            3. Redeploy the contract if needed
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Test 2: Get admin address
+                const admin = await contract.methods.admin().call();
+                console.log('Admin address:', admin);
+                
+                // Test 3: Get record count
+                const count = await contract.methods.getRecordCount().call();
+                console.log('Record count:', count);
+                
+                // Test 4: Check user role
+                const isCollector = await contract.methods.collectors(currentAccount).call();
+                console.log('Is collector:', isCollector);
+                console.log('Is admin:', admin.toLowerCase() === currentAccount.toLowerCase());
+                
+                // Display results
+                recordsContainer.innerHTML = `
+                    <div class="success">
+                        <strong>✅ Contract Connection Successful!</strong><br><br>
+                        <strong>Contract Details:</strong><br>
+                        • Address: ${CONTRACT_ADDRESS}<br>
+                        • Admin: ${admin}<br>
+                        • Total Records: ${count}<br>
+                        • Your Role: ${admin.toLowerCase() === currentAccount.toLowerCase() ? 'Admin' : (isCollector ? 'Collector' : 'Viewer')}<br><br>
+                        ${count > 0 ? 'Click "Refresh Records" to view all records.' : 'No records found. Add your first record using the form above.'}
+                    </div>
+                `;
+                
+                console.log('=== Contract Test Completed ===');
+                
+            } catch (error) {
+                console.error('Contract test failed:', error);
+                recordsContainer.innerHTML = `
+                    <div class="error">
+                        <strong>❌ Contract Test Failed</strong><br><br>
+                        <strong>Error:</strong> ${error.message}<br><br>
+                        <strong>Common Issues:</strong><br>
+                        1. Wrong network selected in MetaMask<br>
+                        2. Contract address is incorrect<br>
+                        3. Contract ABI doesn't match deployed contract<br><br>
+                        Check browser console (F12) for detailed error logs.
+                    </div>
+                `;
+            }
+        }
+
+        async function loadRecords() {
+            const recordsContainer = document.getElementById('recordsContainer');
+            
+            try {
+                // First check if contract is properly initialized
+                if (!contract) {
+                    recordsContainer.innerHTML = '<div class="error">Contract not initialized. Please connect your wallet.</div>';
                     return;
                 }
 
-                recordsContainer.innerHTML = '<div class="loading">Loading records...</div>';
-
-                let recordsHTML = '';
-                for (let i = count - 1; i >= 0; i--) {
-                    const record = await contract.methods.records(i).call();
-                    const date = new Date(record.timestamp * 1000);
-                    const weightInKg = web3.utils.fromWei(record.weight, 'ether');
-
-                    recordsHTML += `
-                        <div class="record-card">
-                            <div class="record-header">
-                                <div class="record-title">Bin #${record.binId}</div>
-                                <span class="waste-type-badge type-${record.wasteType}">
-                                    ${wasteTypeNames[record.wasteType]}
-                                </span>
-                            </div>
-                            <div class="record-details">
-                                <div class="detail-item">
-                                    <span class="detail-label">Location:</span> ${record.location}
-                                </div>
-                                <div class="detail-item">
-                                    <span class="detail-label">Weight:</span> ${parseFloat(weightInKg).toFixed(2)} kg
-                                </div>
-                                <div class="detail-item">
-                                    <span class="detail-label">Date:</span> ${date.toLocaleString()}
-                                </div>
-                                <div class="detail-item">
-                                    <span class="detail-label">Collector ID:</span> #${record.collectorId}
-                                </div>
-                                <div class="detail-item">
-                                    <span class="detail-label">Status:</span> 
-                                    <span class="${record.collectionStatus ? 'status-collected' : 'status-pending'}">
-                                        ${record.collectionStatus ? 'Collected ✓' : 'Pending ⏳'}
-                                    </span>
-                                </div>
-                            </div>
+                // Get record count
+                let count;
+                try {
+                    count = await contract.methods.getRecordCount().call();
+                    console.log('Total records:', count);
+                } catch (e) {
+                    console.error('Error getting record count:', e);
+                    recordsContainer.innerHTML = `
+                        <div class="error">
+                            <strong>Cannot connect to contract</strong><br>
+                            Please verify:<br>
+                            • Contract address is correct<br>
+                            • You're on the right network<br>
+                            • Contract is deployed properly
                         </div>
                     `;
+                    document.getElementById('recordCount').textContent = '0';
+                    return;
                 }
 
-                recordsContainer.innerHTML = recordsHTML;
+                document.getElementById('recordCount').textContent = count;
+
+                if (count == 0) {
+                    recordsContainer.innerHTML = `
+                        <div class="info-box">
+                            <strong>📋 No records yet</strong><br>
+                            Start by recording your first waste collection using the form above.<br><br>
+                            <strong>Note:</strong> You need to be Admin or an authorized Collector to add records.
+                        </div>
+                    `;
+                    return;
+                }
+
+                recordsContainer.innerHTML = '<div class="loading">Loading ' + count + ' record(s)...</div>';
+
+                let recordsHTML = '';
+                let loadedCount = 0;
+                
+                // Load records in reverse order (newest first)
+                for (let i = parseInt(count) - 1; i >= 0; i--) {
+                    try {
+                        console.log('Loading record index:', i);
+                        const record = await contract.methods.records(i).call();
+                        console.log('Record data:', record);
+                        
+                        const date = new Date(parseInt(record.timestamp) * 1000);
+                        const weightInKg = web3.utils.fromWei(record.weight.toString(), 'ether');
+
+                        recordsHTML += `
+                            <div class="record-card">
+                                <div class="record-header">
+                                    <div class="record-title">Bin #${record.binId}</div>
+                                    <span class="waste-type-badge type-${record.wasteType}">
+                                        ${wasteTypeNames[record.wasteType]}
+                                    </span>
+                                </div>
+                                <div class="record-details">
+                                    <div class="detail-item">
+                                        <span class="detail-label">Location:</span> ${record.location}
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Weight:</span> ${parseFloat(weightInKg).toFixed(2)} kg
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Date:</span> ${date.toLocaleString()}
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Collector ID:</span> #${record.collectorId}
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Status:</span> 
+                                        <span class="${record.collectionStatus ? 'status-collected' : 'status-pending'}">
+                                            ${record.collectionStatus ? 'Collected ✓' : 'Pending ⏳'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        loadedCount++;
+                    } catch (recordError) {
+                        console.error(`Error loading record ${i}:`, recordError);
+                        recordsHTML += `
+                            <div class="error" style="margin-bottom: 10px;">
+                                <strong>Error loading record #${i}</strong><br>
+                                ${recordError.message}
+                            </div>
+                        `;
+                    }
+                }
+
+                if (recordsHTML) {
+                    recordsContainer.innerHTML = recordsHTML;
+                    console.log(`Successfully loaded ${loadedCount} out of ${count} records`);
+                } else {
+                    recordsContainer.innerHTML = '<div class="error">Could not load any records. Check console for details.</div>';
+                }
             } catch (error) {
-                console.error('Error loading records:', error);
+                console.error('Critical error in loadRecords:', error);
                 document.getElementById('recordsContainer').innerHTML = 
-                    '<div class="error">Error loading records: ' + error.message + '</div>';
+                    `<div class="error">
+                        <strong>Error loading records</strong><br>
+                        ${error.message}<br><br>
+                        Check browser console (F12) for more details.
+                    </div>`;
+                document.getElementById('recordCount').textContent = '0';
             }
         }
 
