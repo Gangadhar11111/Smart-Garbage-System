@@ -385,8 +385,21 @@
     </div>
 
     <script>
-        // Contract ABI
+        // Contract ABI - Exact copy from Remix
         const CONTRACT_ABI = [
+            {
+                "inputs": [
+                    {
+                        "internalType": "address",
+                        "name": "_collector",
+                        "type": "address"
+                    }
+                ],
+                "name": "addCollector",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
             {
                 "inputs": [],
                 "stateMutability": "nonpayable",
@@ -419,6 +432,57 @@
                 "type": "event"
             },
             {
+                "inputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "_binId",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "_location",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "enum WasteManagement.WasteType",
+                        "name": "_wasteType",
+                        "type": "uint8"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "_weight",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "bool",
+                        "name": "_collectionStatus",
+                        "type": "bool"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "_collectorId",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "recordWaste",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "address",
+                        "name": "_collector",
+                        "type": "address"
+                    }
+                ],
+                "name": "removeCollector",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
                 "anonymous": false,
                 "inputs": [
                     {
@@ -442,19 +506,6 @@
                 ],
                 "name": "WasteRecorded",
                 "type": "event"
-            },
-            {
-                "inputs": [
-                    {
-                        "internalType": "address",
-                        "name": "_collector",
-                        "type": "address"
-                    }
-                ],
-                "name": "addCollector",
-                "outputs": [],
-                "stateMutability": "nonpayable",
-                "type": "function"
             },
             {
                 "inputs": [],
@@ -505,44 +556,6 @@
                 "inputs": [
                     {
                         "internalType": "uint256",
-                        "name": "_binId",
-                        "type": "uint256"
-                    },
-                    {
-                        "internalType": "string",
-                        "name": "_location",
-                        "type": "string"
-                    },
-                    {
-                        "internalType": "enum WasteManagement.WasteType",
-                        "name": "_wasteType",
-                        "type": "uint8"
-                    },
-                    {
-                        "internalType": "uint256",
-                        "name": "_weight",
-                        "type": "uint256"
-                    },
-                    {
-                        "internalType": "bool",
-                        "name": "_collectionStatus",
-                        "type": "bool"
-                    },
-                    {
-                        "internalType": "uint256",
-                        "name": "_collectorId",
-                        "type": "uint256"
-                    }
-                ],
-                "name": "recordWaste",
-                "outputs": [],
-                "stateMutability": "nonpayable",
-                "type": "function"
-            },
-            {
-                "inputs": [
-                    {
-                        "internalType": "uint256",
                         "name": "",
                         "type": "uint256"
                     }
@@ -586,19 +599,6 @@
                     }
                 ],
                 "stateMutability": "view",
-                "type": "function"
-            },
-            {
-                "inputs": [
-                    {
-                        "internalType": "address",
-                        "name": "_collector",
-                        "type": "address"
-                    }
-                ],
-                "name": "removeCollector",
-                "outputs": [],
-                "stateMutability": "nonpayable",
                 "type": "function"
             }
         ];
@@ -714,9 +714,11 @@
             }
 
             try {
+                showMessage('recordMessage', 'Submitting transaction... Please confirm in MetaMask', 'info-box');
+                
                 const weightInWei = web3.utils.toWei(weight, 'ether');
                 
-                await contract.methods.recordWaste(
+                const tx = await contract.methods.recordWaste(
                     binId,
                     location,
                     wasteType,
@@ -725,17 +727,23 @@
                     collectorId
                 ).send({ from: currentAccount });
 
-                showMessage('recordMessage', 'Waste record successfully added!', 'success');
+                console.log('Transaction successful:', tx);
+                showMessage('recordMessage', '✅ Waste record successfully added! Transaction: ' + tx.transactionHash, 'success');
                 
+                // Clear form
                 document.getElementById('binId').value = '';
                 document.getElementById('location').value = '';
                 document.getElementById('weight').value = '';
                 document.getElementById('collectorId').value = '';
                 
-                await loadRecords();
+                // Reload records after 2 seconds to allow blockchain to update
+                setTimeout(async () => {
+                    await loadRecords();
+                }, 2000);
+                
             } catch (error) {
                 console.error('Error recording waste:', error);
-                showMessage('recordMessage', 'Error: ' + error.message, 'error');
+                showMessage('recordMessage', '❌ Error: ' + error.message, 'error');
             }
         }
 
@@ -850,26 +858,34 @@
             const recordsContainer = document.getElementById('recordsContainer');
             
             try {
+                console.log('=== Loading Records Started ===');
+                
                 // First check if contract is properly initialized
                 if (!contract) {
                     recordsContainer.innerHTML = '<div class="error">Contract not initialized. Please connect your wallet.</div>';
                     return;
                 }
 
+                console.log('Contract initialized:', !!contract);
+                console.log('Contract address:', CONTRACT_ADDRESS);
+
                 // Get record count
                 let count;
                 try {
+                    recordsContainer.innerHTML = '<div class="loading">Connecting to contract...</div>';
                     count = await contract.methods.getRecordCount().call();
-                    console.log('Total records:', count);
+                    console.log('✅ Record count retrieved:', count);
                 } catch (e) {
-                    console.error('Error getting record count:', e);
+                    console.error('❌ Error getting record count:', e);
                     recordsContainer.innerHTML = `
                         <div class="error">
                             <strong>Cannot connect to contract</strong><br>
+                            Error: ${e.message}<br><br>
                             Please verify:<br>
-                            • Contract address is correct<br>
-                            • You're on the right network<br>
-                            • Contract is deployed properly
+                            • Contract address: ${CONTRACT_ADDRESS}<br>
+                            • You're on the right network in MetaMask<br>
+                            • Contract is deployed properly<br><br>
+                            Try clicking "Test Contract" first.
                         </div>
                     `;
                     document.getElementById('recordCount').textContent = '0';
@@ -878,7 +894,8 @@
 
                 document.getElementById('recordCount').textContent = count;
 
-                if (count == 0) {
+                if (count == 0 || count == '0') {
+                    console.log('ℹ️ No records found');
                     recordsContainer.innerHTML = `
                         <div class="info-box">
                             <strong>📋 No records yet</strong><br>
@@ -890,6 +907,7 @@
                 }
 
                 recordsContainer.innerHTML = '<div class="loading">Loading ' + count + ' record(s)...</div>';
+                console.log('Loading', count, 'records...');
 
                 let recordsHTML = '';
                 let loadedCount = 0;
@@ -897,9 +915,9 @@
                 // Load records in reverse order (newest first)
                 for (let i = parseInt(count) - 1; i >= 0; i--) {
                     try {
-                        console.log('Loading record index:', i);
+                        console.log(`Loading record index ${i}...`);
                         const record = await contract.methods.records(i).call();
-                        console.log('Record data:', record);
+                        console.log(`✅ Record ${i} loaded:`, record);
                         
                         const date = new Date(parseInt(record.timestamp) * 1000);
                         const weightInKg = web3.utils.fromWei(record.weight.toString(), 'ether');
@@ -936,7 +954,7 @@
                         `;
                         loadedCount++;
                     } catch (recordError) {
-                        console.error(`Error loading record ${i}:`, recordError);
+                        console.error(`❌ Error loading record ${i}:`, recordError);
                         recordsHTML += `
                             <div class="error" style="margin-bottom: 10px;">
                                 <strong>Error loading record #${i}</strong><br>
@@ -948,12 +966,14 @@
 
                 if (recordsHTML) {
                     recordsContainer.innerHTML = recordsHTML;
-                    console.log(`Successfully loaded ${loadedCount} out of ${count} records`);
+                    console.log(`✅ Successfully loaded ${loadedCount} out of ${count} records`);
+                    console.log('=== Loading Records Completed ===');
                 } else {
                     recordsContainer.innerHTML = '<div class="error">Could not load any records. Check console for details.</div>';
+                    console.log('❌ No records could be loaded');
                 }
             } catch (error) {
-                console.error('Critical error in loadRecords:', error);
+                console.error('❌ Critical error in loadRecords:', error);
                 document.getElementById('recordsContainer').innerHTML = 
                     `<div class="error">
                         <strong>Error loading records</strong><br>
