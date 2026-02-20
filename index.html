@@ -4,15 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Waste Management dApp</title>
-    <script src="https://cdn.ethers.io/lib/ethers-5.7.umd.min.js" type="text/javascript"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; line-height: 1.6; background-color: #f4f7f6; }
+        body { font-family: 'Segoe UI', sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; line-height: 1.6; background-color: #f4f7f6; }
         .card { border: none; padding: 20px; border-radius: 12px; margin-bottom: 20px; background: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         h2, h3 { color: #2c3e50; margin-top: 0; }
         input, select, button { display: block; width: 100%; margin: 12px 0; padding: 12px; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; font-size: 1rem; }
         button { background: #2ecc71; color: white; border: none; cursor: pointer; font-weight: bold; transition: background 0.3s; }
         button:hover { background: #27ae60; }
-        button:disabled { background: #bdc3c7; cursor: not-allowed; }
         .admin-btn { background: #3498db; }
         .remove-btn { background: #e74c3c; }
         .status { font-weight: bold; color: #2980b9; }
@@ -33,7 +31,7 @@
 
     <div class="card">
         <h3>📝 Record New Waste</h3>
-        <input type="number" id="binId" placeholder="Bin ID (e.g. 101)">
+        <input type="number" id="binId" placeholder="Bin ID">
         <input type="text" id="location" placeholder="Location Name">
         <select id="wasteType">
             <option value="0">Biodegradable</option>
@@ -42,28 +40,28 @@
             <option value="3">Non-Recyclable</option>
         </select>
         <input type="number" id="weight" placeholder="Weight (kg)">
-        <input type="number" id="collectorId" placeholder="Collector ID Number">
+        <input type="number" id="collectorId" placeholder="Collector ID">
         <button onclick="recordWaste()">Submit to Blockchain</button>
     </div>
 
     <div class="card">
         <h3>📊 Records Summary</h3>
         <p>Total Records: <span id="recordCount" class="status">0</span></p>
-        <button class="admin-btn" onclick="fetchAllRecords()">Refresh & View All Records</button>
+        <button class="admin-btn" onclick="fetchAllRecords()">View All Records</button>
         <div id="recordsList"></div>
     </div>
 
     <div class="card" style="border-top: 4px solid #3498db;">
         <h3>🛡️ Admin Tools</h3>
-        <input type="text" id="collectorAddr" placeholder="Collector Wallet Address (0x...)">
+        <input type="text" id="collectorAddr" placeholder="Collector Wallet Address">
         <button class="admin-btn" onclick="manageCollector(true)">Authorize Collector</button>
         <button class="remove-btn" onclick="manageCollector(false)">Revoke Authorization</button>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js" type="text/javascript"></script>
+
     <script>
         const contractAddress = "0x3cA38E089Cd3BF3cF24Dabc40dF0c988075b2729";
-        
-        // Full ABI to support all features including the records getter
         const abi = [
             "function addCollector(address _collector) public",
             "function removeCollector(address _collector) public",
@@ -77,27 +75,29 @@
         const wasteTypes = ["Biodegradable", "Non-Biodegradable", "Recyclable", "Non-Recyclable"];
 
         async function connectWallet() {
-            if (typeof window.ethereum !== 'undefined') {
+            // Check if ethers library loaded correctly
+            if (typeof ethers === 'undefined') {
+                alert("The Ethers.js library failed to load. Please check your internet connection.");
+                return;
+            }
+
+            if (window.ethereum) {
                 try {
-                    // Start requesting accounts
-                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
                     provider = new ethers.providers.Web3Provider(window.ethereum);
+                    await window.ethereum.request({ method: 'eth_requestAccounts' });
                     signer = provider.getSigner();
                     const address = await signer.getAddress();
                     
                     document.getElementById("walletAddress").innerText = "Connected: " + address;
                     document.getElementById("connectBtn").innerText = "Wallet Linked";
-                    document.getElementById("connectBtn").disabled = true;
-
-                    contract = new ethers.Contract(contractAddress, abi, signer);
                     
+                    contract = new ethers.Contract(contractAddress, abi, signer);
                     updateRecordCount();
                 } catch (error) {
-                    console.error(error);
                     alert("Connection failed: " + error.message);
                 }
             } else {
-                alert("MetaMask is not installed. Please install it to use this app.");
+                alert("MetaMask not detected!");
             }
         }
 
@@ -108,39 +108,31 @@
         }
 
         async function recordWaste() {
-            if (!contract) return alert("Please connect wallet first!");
+            if (!contract) return alert("Connect wallet first!");
             try {
-                const binId = document.getElementById("binId").value;
-                const loc = document.getElementById("location").value;
-                const type = document.getElementById("wasteType").value;
-                const weight = document.getElementById("weight").value;
-                const cId = document.getElementById("collectorId").value;
-
-                const tx = await contract.recordWaste(binId, loc, type, weight, true, cId);
-                alert("Transaction sent! Waiting for confirmation...");
+                const tx = await contract.recordWaste(
+                    document.getElementById("binId").value, 
+                    document.getElementById("location").value, 
+                    document.getElementById("wasteType").value, 
+                    document.getElementById("weight").value, 
+                    true, 
+                    document.getElementById("collectorId").value
+                );
                 await tx.wait();
-                alert("Success! Record added to blockchain.");
+                alert("Record added!");
                 updateRecordCount();
             } catch (err) {
-                alert("Error: " + (err.reason || "Transaction failed. Are you an authorized collector?"));
+                alert("Error: " + (err.reason || "Transaction failed. Only authorized collectors can record waste."));
             }
         }
 
         async function fetchAllRecords() {
             if (!contract) return alert("Connect wallet first!");
             const count = await contract.getRecordCount();
-            let html = `<table><tr><th>Bin ID</th><th>Location</th><th>Type</th><th>Weight</th><th>Time</th></tr>`;
-            
+            let html = `<table><tr><th>Bin ID</th><th>Type</th><th>Weight</th><th>Time</th></tr>`;
             for (let i = 0; i < count; i++) {
                 const r = await contract.records(i);
-                const date = new Date(r.timestamp * 1000).toLocaleString();
-                html += `<tr>
-                    <td>${r.binId}</td>
-                    <td>${r.location}</td>
-                    <td>${wasteTypes[r.wasteType]}</td>
-                    <td>${r.weight} kg</td>
-                    <td>${date}</td>
-                </tr>`;
+                html += `<tr><td>${r.binId}</td><td>${wasteTypes[r.wasteType]}</td><td>${r.weight}kg</td><td>${new Date(r.timestamp * 1000).toLocaleDateString()}</td></tr>`;
             }
             html += `</table>`;
             document.getElementById("recordsList").innerHTML = html;
@@ -150,13 +142,11 @@
             if (!contract) return alert("Connect wallet first!");
             try {
                 const addr = document.getElementById("collectorAddr").value;
-                if (!ethers.utils.isAddress(addr)) return alert("Invalid Address!");
-                
                 const tx = isAdding ? await contract.addCollector(addr) : await contract.removeCollector(addr);
                 await tx.wait();
-                alert("Collector list updated successfully!");
+                alert("Collector status updated!");
             } catch (err) {
-                alert("Admin error: " + (err.reason || "You must be the admin to do this."));
+                alert("Error: " + (err.reason || "Admin access required."));
             }
         }
     </script>
