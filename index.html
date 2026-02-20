@@ -1,154 +1,720 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Waste Management dApp</title>
-    <style>
-        body { font-family: 'Segoe UI', sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; line-height: 1.6; background-color: #f4f7f6; }
-        .card { border: none; padding: 20px; border-radius: 12px; margin-bottom: 20px; background: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        h2, h3 { color: #2c3e50; margin-top: 0; }
-        input, select, button { display: block; width: 100%; margin: 12px 0; padding: 12px; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; font-size: 1rem; }
-        button { background: #2ecc71; color: white; border: none; cursor: pointer; font-weight: bold; transition: background 0.3s; }
-        button:hover { background: #27ae60; }
-        .admin-btn { background: #3498db; }
-        .remove-btn { background: #e74c3c; }
-        .status { font-weight: bold; color: #2980b9; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 0.9rem; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background-color: #f8f9fa; }
-        #walletAddress { font-size: 0.85rem; word-break: break-all; color: #7f8c8d; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WasteChain — Smart Waste Management</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg: #0a0f0a;
+      --surface: #111811;
+      --surface2: #182018;
+      --border: #2a382a;
+      --accent: #4cff6e;
+      --accent2: #a8ff78;
+      --warn: #ffcc00;
+      --danger: #ff4b4b;
+      --text: #e8f5e8;
+      --muted: #6a886a;
+      --mono: 'DM Mono', monospace;
+      --display: 'Bebas Neue', sans-serif;
+      --body: 'DM Sans', sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--body);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(76,255,110,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(76,255,110,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .page { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 0 24px 60px; }
+
+    /* Header */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 28px 0 32px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 40px;
+    }
+
+    .logo {
+      font-family: var(--display);
+      font-size: 2.2rem;
+      letter-spacing: 2px;
+      color: var(--accent);
+      text-shadow: 0 0 30px rgba(76,255,110,0.4);
+    }
+
+    .logo span { color: var(--text); }
+
+    #connectBtn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      letter-spacing: 1px;
+      padding: 10px 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-transform: uppercase;
+    }
+
+    #connectBtn:hover { background: rgba(76,255,110,0.1); box-shadow: 0 0 20px rgba(76,255,110,0.15); }
+    #connectBtn.connected { border-color: var(--muted); color: var(--muted); }
+
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--danger);
+      transition: background 0.3s;
+    }
+    .dot.live { background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: pulse 2s infinite; }
+
+    @keyframes pulse {
+      0%,100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* Status bar */
+    #statusBar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      padding: 12px 20px;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 36px;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    #statusBar span { color: var(--accent); }
+
+    /* Section label */
+    .section-label {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    /* Grid layout */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    @media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    /* Cards */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 28px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 3px; height: 100%;
+      background: var(--accent);
+    }
+
+    .card h2 {
+      font-family: var(--display);
+      font-size: 1.5rem;
+      letter-spacing: 2px;
+      color: var(--accent);
+      margin-bottom: 24px;
+    }
+
+    /* Form */
+    .form-group { margin-bottom: 18px; }
+
+    label {
+      display: block;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    input, select {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 0.88rem;
+      padding: 12px 14px;
+      outline: none;
+      transition: border-color 0.2s;
+      appearance: none;
+    }
+
+    input:focus, select:focus { border-color: var(--accent); }
+
+    select option { background: var(--bg); }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    input[type="checkbox"] {
+      width: 18px; height: 18px;
+      accent-color: var(--accent);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .checkbox-label {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    /* Buttons */
+    .btn {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 14px 28px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      width: 100%;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: var(--bg);
+      font-weight: 600;
+    }
+
+    .btn-primary:hover { background: var(--accent2); box-shadow: 0 0 24px rgba(76,255,110,0.3); }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+    }
+
+    .btn-secondary:hover { background: rgba(76,255,110,0.08); }
+    .btn-danger { background: var(--danger); color: #fff; }
+
+    /* Admin section */
+    .admin-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .admin-row input { flex: 1; margin-bottom: 0; }
+    .admin-row .btn { width: auto; flex-shrink: 0; font-size: 0.75rem; padding: 12px 18px; }
+
+    /* Stats */
+    .stat-block {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      padding: 20px;
+      text-align: center;
+    }
+
+    .stat-num {
+      font-family: var(--display);
+      font-size: 3rem;
+      color: var(--accent);
+      line-height: 1;
+    }
+
+    .stat-label {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    /* Records */
+    #recordsList { margin-top: 8px; }
+
+    .record-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      padding: 16px 20px;
+      margin-bottom: 10px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+
+    .record-field { }
+    .record-field .rf-label {
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .record-field .rf-val {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      color: var(--text);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      letter-spacing: 1px;
+      border-radius: 2px;
+    }
+
+    .badge-green { background: rgba(76,255,110,0.15); color: var(--accent); }
+    .badge-yellow { background: rgba(255,204,0,0.15); color: var(--warn); }
+    .badge-red { background: rgba(255,75,75,0.15); color: var(--danger); }
+
+    /* Toast */
+    #toast {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      padding: 14px 20px;
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      max-width: 360px;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.3s;
+      z-index: 1000;
+      pointer-events: none;
+    }
+
+    #toast.show { opacity: 1; transform: translateY(0); }
+    #toast.error { border-left-color: var(--danger); color: var(--danger); }
+    #toast.success { border-left-color: var(--accent); color: var(--accent); }
+    #toast.warn { border-left-color: var(--warn); color: var(--warn); }
+
+    .full-card { grid-column: 1 / -1; }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      letter-spacing: 1px;
+    }
+
+    /* Contract address input */
+    .contract-setup {
+      background: var(--surface);
+      border: 1px solid var(--warn);
+      padding: 20px 24px;
+      margin-bottom: 28px;
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+    }
+
+    .contract-setup .form-group { margin-bottom: 0; flex: 1; }
+
+    .loading-dots::after {
+      content: '...';
+      animation: dots 1.5s steps(3,end) infinite;
+    }
+    @keyframes dots {
+      0%  { content: '.'; }
+      33% { content: '..'; }
+      66% { content: '...'; }
+    }
+  </style>
 </head>
 <body>
+<div class="page">
 
-    <h2>🌍 Waste Management System</h2>
-    
-    <div id="accountArea" class="card">
-        <button id="connectBtn" onclick="connectWallet()">Connect MetaMask</button>
-        <p id="walletAddress">Status: Not Connected</p>
+  <header>
+    <div class="logo">Waste<span>Chain</span></div>
+    <button id="connectBtn" onclick="connectWallet()">
+      <div class="dot" id="connDot"></div>
+      <span id="connText">Connect MetaMask</span>
+    </button>
+  </header>
+
+  <div id="statusBar">
+    <span>Network: <span id="netName">—</span></span>
+    <span>Account: <span id="accountDisplay">Not connected</span></span>
+    <span>Role: <span id="roleDisplay">—</span></span>
+    <span>Records: <span id="recordCount">0</span></span>
+  </div>
+
+  <!-- Contract Setup -->
+  <div class="contract-setup">
+    <div class="form-group">
+      <label>Contract Address (paste your deployed address)</label>
+      <input type="text" id="contractAddress" placeholder="0x..." value=""/>
     </div>
+    <button class="btn btn-secondary" style="width:auto;padding:12px 20px" onclick="loadContract()">Load</button>
+  </div>
 
+  <!-- Stats Row -->
+  <div class="grid-2" style="margin-bottom:20px">
+    <div class="stat-block">
+      <div class="stat-num" id="statRecords">0</div>
+      <div class="stat-label">Total Records</div>
+    </div>
+    <div class="stat-block">
+      <div class="stat-num" id="statCollectors">—</div>
+      <div class="stat-label">Your Status</div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+
+    <!-- Record Waste -->
     <div class="card">
-        <h3>📝 Record New Waste</h3>
-        <input type="number" id="binId" placeholder="Bin ID">
-        <input type="text" id="location" placeholder="Location Name">
+      <h2>Record Waste</h2>
+
+      <div class="form-group">
+        <label>Bin ID</label>
+        <input type="number" id="binId" placeholder="e.g. 101" min="0"/>
+      </div>
+      <div class="form-group">
+        <label>Location</label>
+        <input type="text" id="location" placeholder="e.g. Sector 4, Block B"/>
+      </div>
+      <div class="form-group">
+        <label>Waste Type</label>
         <select id="wasteType">
-            <option value="0">Biodegradable</option>
-            <option value="1">Non-Biodegradable</option>
-            <option value="2">Recyclable</option>
-            <option value="3">Non-Recyclable</option>
+          <option value="0">Biodegradable</option>
+          <option value="1">Non-Biodegradable</option>
+          <option value="2">Recyclable</option>
+          <option value="3">Non-Recyclable</option>
         </select>
-        <input type="number" id="weight" placeholder="Weight (kg)">
-        <input type="number" id="collectorId" placeholder="Collector ID">
-        <button onclick="recordWaste()">Submit to Blockchain</button>
+      </div>
+      <div class="form-group">
+        <label>Weight (kg)</label>
+        <input type="number" id="weight" placeholder="e.g. 25" min="0"/>
+      </div>
+      <div class="form-group">
+        <label>Collector ID</label>
+        <input type="number" id="collectorId" placeholder="e.g. 7" min="0"/>
+      </div>
+      <div class="form-group">
+        <div class="checkbox-row">
+          <input type="checkbox" id="collectionStatus" checked/>
+          <label class="checkbox-label" for="collectionStatus" style="margin:0;text-transform:none;letter-spacing:0;font-size:0.88rem">Collection completed</label>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="recordBtn" onclick="recordWaste()" disabled>
+        Submit Record
+      </button>
     </div>
 
+    <!-- Admin Panel -->
     <div class="card">
-        <h3>📊 Records Summary</h3>
-        <p>Total Records: <span id="recordCount" class="status">0</span></p>
-        <button class="admin-btn" onclick="fetchAllRecords()">View All Records</button>
-        <div id="recordsList"></div>
+      <h2>Admin Panel</h2>
+
+      <div class="section-label">Add Collector</div>
+      <div class="admin-row">
+        <input type="text" id="addCollectorAddr" placeholder="0x..."/>
+        <button class="btn btn-primary" onclick="addCollector()" style="width:auto;padding:12px 18px">Add</button>
+      </div>
+
+      <div class="section-label" style="margin-top:16px">Remove Collector</div>
+      <div class="admin-row">
+        <input type="text" id="removeCollectorAddr" placeholder="0x..."/>
+        <button class="btn btn-danger" onclick="removeCollector()" style="width:auto;padding:12px 14px;font-family:var(--mono);font-size:0.75rem;letter-spacing:1px;text-transform:uppercase;cursor:pointer">Remove</button>
+      </div>
+
+      <hr style="border:none;border-top:1px solid var(--border);margin:24px 0"/>
+
+      <div class="section-label">Check Collector Status</div>
+      <div class="admin-row">
+        <input type="text" id="checkCollectorAddr" placeholder="0x..."/>
+        <button class="btn btn-secondary" onclick="checkCollector()" style="width:auto;padding:12px 18px">Check</button>
+      </div>
+
+      <div id="checkResult" style="margin-top:12px;font-family:var(--mono);font-size:0.82rem;display:none"></div>
+
+      <hr style="border:none;border-top:1px solid var(--border);margin:24px 0"/>
+
+      <button class="btn btn-secondary" onclick="loadRecords()">↻ Refresh Records</button>
     </div>
 
-    <div class="card" style="border-top: 4px solid #3498db;">
-        <h3>🛡️ Admin Tools</h3>
-        <input type="text" id="collectorAddr" placeholder="Collector Wallet Address">
-        <button class="admin-btn" onclick="manageCollector(true)">Authorize Collector</button>
-        <button class="remove-btn" onclick="manageCollector(false)">Revoke Authorization</button>
+  </div>
+
+  <!-- Records -->
+  <div class="card" style="margin-top:20px">
+    <h2>Waste Records</h2>
+    <div id="recordsList">
+      <div class="empty-state">No records loaded. Connect wallet and load the contract.</div>
     </div>
+  </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js" type="text/javascript"></script>
+</div>
 
-    <script>
-        const contractAddress = "0x3cA38E089Cd3BF3cF24Dabc40dF0c988075b2729";
-        const abi = [
-            "function addCollector(address _collector) public",
-            "function removeCollector(address _collector) public",
-            "function recordWaste(uint256 _binId, string _location, uint8 _wasteType, uint256 _weight, bool _collectionStatus, uint256 _collectorId) public",
-            "function getRecordCount() public view returns (uint256)",
-            "function records(uint256) public view returns (uint256 binId, string location, uint256 timestamp, uint8 wasteType, uint256 weight, bool collectionStatus, uint256 collectorId)",
-            "function admin() public view returns (address)"
-        ];
+<div id="toast"></div>
 
-        let provider, signer, contract;
-        const wasteTypes = ["Biodegradable", "Non-Biodegradable", "Recyclable", "Non-Recyclable"];
+<script>
+// ─── ABI ──────────────────────────────────────────────────────
+const ABI = [
+  {"inputs":[],"stateMutability":"nonpayable","type":"constructor"},
+  {"inputs":[{"internalType":"address","name":"_collector","type":"address"}],"name":"addCollector","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[],"name":"admin","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"collectors","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"getRecordCount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"_binId","type":"uint256"},{"internalType":"string","name":"_location","type":"string"},{"internalType":"uint8","name":"_wasteType","type":"uint8"},{"internalType":"uint256","name":"_weight","type":"uint256"},{"internalType":"bool","name":"_collectionStatus","type":"bool"},{"internalType":"uint256","name":"_collectorId","type":"uint256"}],"name":"recordWaste","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"records","outputs":[{"internalType":"uint256","name":"binId","type":"uint256"},{"internalType":"string","name":"location","type":"string"},{"internalType":"uint256","name":"timestamp","type":"uint256"},{"internalType":"uint8","name":"wasteType","type":"uint8"},{"internalType":"uint256","name":"weight","type":"uint256"},{"internalType":"bool","name":"collectionStatus","type":"bool"},{"internalType":"uint256","name":"collectorId","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"address","name":"_collector","type":"address"}],"name":"removeCollector","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"collector","type":"address"}],"name":"CollectorAdded","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"collector","type":"address"}],"name":"CollectorRemoved","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"binId","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"timestamp","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"collectorId","type":"uint256"}],"name":"WasteRecorded","type":"event"}
+];
 
-        async function connectWallet() {
-            // Check if ethers library loaded correctly
-            if (typeof ethers === 'undefined') {
-                alert("The Ethers.js library failed to load. Please check your internet connection.");
-                return;
-            }
+const WASTE_TYPES = ['Biodegradable','Non-Biodegradable','Recyclable','Non-Recyclable'];
+const WASTE_BADGES = ['badge-green','badge-green','badge-yellow','badge-red'];
 
-            if (window.ethereum) {
-                try {
-                    provider = new ethers.providers.Web3Provider(window.ethereum);
-                    await window.ethereum.request({ method: 'eth_requestAccounts' });
-                    signer = provider.getSigner();
-                    const address = await signer.getAddress();
-                    
-                    document.getElementById("walletAddress").innerText = "Connected: " + address;
-                    document.getElementById("connectBtn").innerText = "Wallet Linked";
-                    
-                    contract = new ethers.Contract(contractAddress, abi, signer);
-                    updateRecordCount();
-                } catch (error) {
-                    alert("Connection failed: " + error.message);
-                }
-            } else {
-                alert("MetaMask not detected!");
-            }
-        }
+let provider, signer, contract;
+let userAccount = null;
+let isAdmin = false;
 
-        async function updateRecordCount() {
-            if (!contract) return;
-            const count = await contract.getRecordCount();
-            document.getElementById("recordCount").innerText = count.toString();
-        }
+// ─── Wallet ──────────────────────────────────────────────────
+async function connectWallet() {
+  if (!window.ethereum) { toast('MetaMask not found. Please install it.', 'error'); return; }
 
-        async function recordWaste() {
-            if (!contract) return alert("Connect wallet first!");
-            try {
-                const tx = await contract.recordWaste(
-                    document.getElementById("binId").value, 
-                    document.getElementById("location").value, 
-                    document.getElementById("wasteType").value, 
-                    document.getElementById("weight").value, 
-                    true, 
-                    document.getElementById("collectorId").value
-                );
-                await tx.wait();
-                alert("Record added!");
-                updateRecordCount();
-            } catch (err) {
-                alert("Error: " + (err.reason || "Transaction failed. Only authorized collectors can record waste."));
-            }
-        }
+  try {
+    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    userAccount = accounts[0];
 
-        async function fetchAllRecords() {
-            if (!contract) return alert("Connect wallet first!");
-            const count = await contract.getRecordCount();
-            let html = `<table><tr><th>Bin ID</th><th>Type</th><th>Weight</th><th>Time</th></tr>`;
-            for (let i = 0; i < count; i++) {
-                const r = await contract.records(i);
-                html += `<tr><td>${r.binId}</td><td>${wasteTypes[r.wasteType]}</td><td>${r.weight}kg</td><td>${new Date(r.timestamp * 1000).toLocaleDateString()}</td></tr>`;
-            }
-            html += `</table>`;
-            document.getElementById("recordsList").innerHTML = html;
-        }
+    provider = new ethers.BrowserProvider(window.ethereum);
+    signer = await provider.getSigner();
 
-        async function manageCollector(isAdding) {
-            if (!contract) return alert("Connect wallet first!");
-            try {
-                const addr = document.getElementById("collectorAddr").value;
-                const tx = isAdding ? await contract.addCollector(addr) : await contract.removeCollector(addr);
-                await tx.wait();
-                alert("Collector status updated!");
-            } catch (err) {
-                alert("Error: " + (err.reason || "Admin access required."));
-            }
-        }
-    </script>
+    const network = await provider.getNetwork();
+    document.getElementById('netName').textContent = network.name || `Chain ${network.chainId}`;
+    document.getElementById('accountDisplay').textContent = short(userAccount);
+    document.getElementById('connDot').classList.add('live');
+    document.getElementById('connText').textContent = short(userAccount);
+    document.getElementById('connectBtn').classList.add('connected');
+
+    window.ethereum.on('accountsChanged', a => { userAccount = a[0]; location.reload(); });
+    window.ethereum.on('chainChanged', () => location.reload());
+
+    toast('Wallet connected!', 'success');
+
+    if (contract) await refreshRole();
+  } catch(e) {
+    toast(e.message || 'Connection failed', 'error');
+  }
+}
+
+async function loadContract() {
+  const addr = document.getElementById('contractAddress').value.trim();
+  if (!addr || !addr.startsWith('0x')) { toast('Enter a valid contract address', 'warn'); return; }
+  if (!signer) { toast('Connect wallet first', 'warn'); return; }
+
+  try {
+    contract = new ethers.Contract(addr, ABI, signer);
+    await refreshRole();
+    await loadRecords();
+    toast('Contract loaded!', 'success');
+  } catch(e) {
+    toast('Failed to load contract: ' + e.message, 'error');
+  }
+}
+
+async function refreshRole() {
+  if (!contract || !userAccount) return;
+  try {
+    const adminAddr = await contract.admin();
+    isAdmin = adminAddr.toLowerCase() === userAccount.toLowerCase();
+    const isCollector = await contract.collectors(userAccount);
+    const role = isAdmin ? 'ADMIN' : isCollector ? 'COLLECTOR' : 'VIEWER';
+    document.getElementById('roleDisplay').textContent = role;
+    document.getElementById('statCollectors').textContent = role;
+    document.getElementById('recordBtn').disabled = !(isAdmin || isCollector);
+  } catch(e) {}
+}
+
+// ─── Record Waste ────────────────────────────────────────────
+async function recordWaste() {
+  if (!contract) { toast('Load contract first', 'warn'); return; }
+  const binId = document.getElementById('binId').value;
+  const location = document.getElementById('location').value.trim();
+  const wasteType = document.getElementById('wasteType').value;
+  const weight = document.getElementById('weight').value;
+  const collectorId = document.getElementById('collectorId').value;
+  const status = document.getElementById('collectionStatus').checked;
+
+  if (!binId || !location || !weight || !collectorId) { toast('Please fill all fields', 'warn'); return; }
+
+  try {
+    setBtnLoading('recordBtn', true);
+    const tx = await contract.recordWaste(binId, location, wasteType, weight, status, collectorId);
+    toast('Transaction sent<span class="loading-dots"></span>', 'success');
+    await tx.wait();
+    toast('Waste recorded on-chain ✓', 'success');
+    await loadRecords();
+  } catch(e) {
+    toast(e.reason || e.message || 'Transaction failed', 'error');
+  } finally {
+    setBtnLoading('recordBtn', false);
+  }
+}
+
+// ─── Admin ───────────────────────────────────────────────────
+async function addCollector() {
+  if (!contract) { toast('Load contract first', 'warn'); return; }
+  const addr = document.getElementById('addCollectorAddr').value.trim();
+  if (!addr) { toast('Enter an address', 'warn'); return; }
+  try {
+    const tx = await contract.addCollector(addr);
+    toast('Adding collector<span class="loading-dots"></span>', 'success');
+    await tx.wait();
+    toast('Collector added ✓', 'success');
+    document.getElementById('addCollectorAddr').value = '';
+  } catch(e) { toast(e.reason || e.message, 'error'); }
+}
+
+async function removeCollector() {
+  if (!contract) { toast('Load contract first', 'warn'); return; }
+  const addr = document.getElementById('removeCollectorAddr').value.trim();
+  if (!addr) { toast('Enter an address', 'warn'); return; }
+  try {
+    const tx = await contract.removeCollector(addr);
+    toast('Removing collector<span class="loading-dots"></span>', 'warn');
+    await tx.wait();
+    toast('Collector removed ✓', 'success');
+    document.getElementById('removeCollectorAddr').value = '';
+  } catch(e) { toast(e.reason || e.message, 'error'); }
+}
+
+async function checkCollector() {
+  if (!contract) { toast('Load contract first', 'warn'); return; }
+  const addr = document.getElementById('checkCollectorAddr').value.trim();
+  if (!addr) { toast('Enter an address', 'warn'); return; }
+  try {
+    const result = await contract.collectors(addr);
+    const el = document.getElementById('checkResult');
+    el.style.display = 'block';
+    el.innerHTML = result
+      ? `<span class="badge badge-green">✓ Authorized Collector</span>`
+      : `<span class="badge badge-red">✗ Not a Collector</span>`;
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ─── Records ─────────────────────────────────────────────────
+async function loadRecords() {
+  if (!contract) return;
+  try {
+    const count = await contract.getRecordCount();
+    const n = Number(count);
+    document.getElementById('recordCount').textContent = n;
+    document.getElementById('statRecords').textContent = n;
+
+    const list = document.getElementById('recordsList');
+    if (n === 0) {
+      list.innerHTML = '<div class="empty-state">No waste records found on-chain.</div>';
+      return;
+    }
+
+    // Load all records
+    const promises = [];
+    for (let i = 0; i < n; i++) promises.push(contract.records(i));
+    const recs = await Promise.all(promises);
+
+    list.innerHTML = recs.reverse().map((r, i) => {
+      const wtIdx = Number(r.wasteType);
+      const date = new Date(Number(r.timestamp) * 1000).toLocaleString();
+      return `
+        <div class="record-item">
+          <div class="record-field"><div class="rf-label">Bin ID</div><div class="rf-val">#${r.binId}</div></div>
+          <div class="record-field"><div class="rf-label">Location</div><div class="rf-val">${r.location}</div></div>
+          <div class="record-field"><div class="rf-label">Waste Type</div><div class="rf-val"><span class="badge ${WASTE_BADGES[wtIdx]}">${WASTE_TYPES[wtIdx]}</span></div></div>
+          <div class="record-field"><div class="rf-label">Weight</div><div class="rf-val">${r.weight} kg</div></div>
+          <div class="record-field"><div class="rf-label">Status</div><div class="rf-val"><span class="badge ${r.collectionStatus ? 'badge-green':'badge-red'}">${r.collectionStatus ? 'Collected':'Pending'}</span></div></div>
+          <div class="record-field"><div class="rf-label">Collector ID</div><div class="rf-val">${r.collectorId}</div></div>
+          <div class="record-field"><div class="rf-label">Timestamp</div><div class="rf-val">${date}</div></div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    toast('Error loading records: ' + e.message, 'error');
+  }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────
+function short(addr) { return addr.slice(0,6) + '...' + addr.slice(-4); }
+
+let toastTimer;
+function toast(msg, type='success') {
+  const el = document.getElementById('toast');
+  el.innerHTML = msg;
+  el.className = `show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.className = '', 3500);
+}
+
+function setBtnLoading(id, loading) {
+  const btn = document.getElementById(id);
+  btn.disabled = loading;
+  btn.textContent = loading ? 'Processing...' : 'Submit Record';
+}
+</script>
+
+<!-- Ethers.js v6 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+
 </body>
 </html>
