@@ -1,218 +1,124 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Waste Management DApp</title>
-    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Waste Management dApp</title>
+    <script src="https://cdn.ethers.io/lib/ethers-5.7.umd.min.js" type="text/javascript"></script>
     <style>
-        body {
-            font-family: Arial;
-            background: #f4f6f9;
-            padding: 20px;
-        }
-        h2 { color: #2c3e50; }
-        .box {
-            background: white;
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            box-shadow: 0px 0px 5px #ccc;
-        }
-        input, select, button {
-            margin: 5px 0;
-            padding: 8px;
-            width: 100%;
-        }
-        button {
-            background: #27ae60;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-        button:hover { background: #219150; }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            padding: 8px;
-            border: 1px solid #ccc;
-            text-align: center;
-        }
-        th { background: #27ae60; color: white; }
+        body { font-family: sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; line-height: 1.6; }
+        .card { border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 20px; background: #f9f9f9; }
+        input, select, button { display: block; width: 100%; margin: 10px 0; padding: 10px; box-sizing: border-box; }
+        button { background: #28a745; color: white; border: none; cursor: pointer; font-weight: bold; }
+        button:hover { background: #218838; }
+        .status { font-weight: bold; color: #007bff; }
     </style>
 </head>
 <body>
 
-<h2>Waste Management DApp</h2>
+    <h2>Waste Management System</h2>
+    <div id="accountArea" class="card">
+        <button onclick="connectWallet()">Connect Wallet</button>
+        <p id="walletAddress">Not Connected</p>
+    </div>
 
-<button onclick="connectWallet()">Connect Wallet</button>
-<p id="walletAddress"></p>
-<p id="roleInfo"></p>
+    <div class="card">
+        <h3>Record Waste</h3>
+        <input type="number" id="binId" placeholder="Bin ID">
+        <input type="text" id="location" placeholder="Location">
+        <select id="wasteType">
+            <option value="0">Biodegradable</option>
+            <option value="1">Non-Biodegradable</option>
+            <option value="2">Recyclable</option>
+            <option value="3">Non-Recyclable</option>
+        </select>
+        <input type="number" id="weight" placeholder="Weight (kg)">
+        <input type="number" id="collectorId" placeholder="Collector ID">
+        <button onclick="recordWaste()">Submit Record</button>
+    </div>
 
-<div class="box" id="adminSection" style="display:none;">
-    <h3>Admin Controls</h3>
-    <input type="text" id="collectorAddress" placeholder="Collector Address">
-    <button onclick="addCollector()">Add Collector</button>
+    <div class="card">
+        <h3>Admin Tools</h3>
+        <input type="text" id="collectorAddr" placeholder="Collector Wallet Address">
+        <button onclick="manageCollector(true)">Add Collector</button>
+        <button onclick="manageCollector(false)" style="background:#dc3545">Remove Collector</button>
+    </div>
 
-    <input type="text" id="removeCollectorAddress" placeholder="Collector Address">
-    <button onclick="removeCollector()">Remove Collector</button>
-</div>
+    <div class="card">
+        <button onclick="fetchRecordCount()">Update Total Records</button>
+        <p>Total Records on Blockchain: <span id="recordCount" class="status">0</span></p>
+    </div>
 
-<div class="box">
-    <h3>Record Waste</h3>
-    <input type="number" id="binId" placeholder="Bin ID">
-    <input type="text" id="location" placeholder="Location">
+    <script>
+        const contractAddress = "0x3cA38E089Cd3BF3cF24Dabc40dF0c988075b2729";
+        const abi = [
+            "function addCollector(address _collector) public",
+            "function removeCollector(address _collector) public",
+            "function recordWaste(uint256 _binId, string _location, uint8 _wasteType, uint256 _weight, bool _collectionStatus, uint256 _collectorId) public",
+            "function getRecordCount() public view returns (uint256)",
+            "function admin() public view returns (address)"
+        ];
 
-    <select id="wasteType">
-        <option value="0">Biodegradable</option>
-        <option value="1">NonBiodegradable</option>
-        <option value="2">Recyclable</option>
-        <option value="3">NonRecyclable</option>
-    </select>
+        let provider, signer, contract;
 
-    <input type="number" id="weight" placeholder="Weight">
-
-    <select id="collectionStatus">
-        <option value="true">Collected</option>
-        <option value="false">Not Collected</option>
-    </select>
-
-    <input type="number" id="collectorId" placeholder="Collector ID">
-
-    <button onclick="recordWaste()">Submit Waste</button>
-</div>
-
-<div class="box">
-    <h3>Waste Records</h3>
-    <button onclick="loadRecords()">Load Records</button>
-    <table>
-        <thead>
-            <tr>
-                <th>Bin ID</th>
-                <th>Location</th>
-                <th>Time</th>
-                <th>Type</th>
-                <th>Weight</th>
-                <th>Status</th>
-                <th>Collector ID</th>
-            </tr>
-        </thead>
-        <tbody id="recordsTable"></tbody>
-    </table>
-</div>
-
-<script>
-let provider;
-let signer;
-let contract;
-
-const contractAddress = "0x3cA38E089Cd3BF3cF24Dabc40dF0c988075b2729";
-
-const contractABI = [PASTE_YOUR_FULL_ABI_HERE];
-
-const wasteTypes = ["Biodegradable","NonBiodegradable","Recyclable","NonRecyclable"];
-
-async function connectWallet() {
-    if (!window.ethereum) return alert("Install MetaMask");
-
-    provider = new ethers.providers.Web3Provider(window.ethereum);
-    await provider.send("eth_requestAccounts", []);
-    signer = provider.getSigner();
-    contract = new ethers.Contract(contractAddress, contractABI, signer);
-
-    const address = await signer.getAddress();
-    document.getElementById("walletAddress").innerText = "Connected: " + address;
-
-    checkRole(address);
-    listenToEvents();
-}
-
-async function checkRole(address) {
-    const admin = await contract.admin();
-    if (address.toLowerCase() === admin.toLowerCase()) {
-        document.getElementById("roleInfo").innerText = "Role: ADMIN";
-        document.getElementById("adminSection").style.display = "block";
-    } else {
-        const isCollector = await contract.collectors(address);
-        if (isCollector) {
-            document.getElementById("roleInfo").innerText = "Role: COLLECTOR";
-        } else {
-            document.getElementById("roleInfo").innerText = "Role: USER";
+        async function connectWallet() {
+            if (window.ethereum) {
+                provider = new ethers.providers.Web3Provider(window.ethereum);
+                await provider.send("eth_requestAccounts", []);
+                signer = provider.getSigner();
+                const address = await signer.getAddress();
+                document.getElementById("walletAddress").innerText = "Connected: " + address;
+                contract = new ethers.Contract(contractAddress, abi, signer);
+                fetchRecordCount();
+            } else {
+                alert("Please install MetaMask!");
+            }
         }
-    }
-}
 
-async function addCollector() {
-    try {
-        const addr = document.getElementById("collectorAddress").value;
-        const tx = await contract.addCollector(addr);
-        await tx.wait();
-        alert("Collector Added");
-    } catch (err) { alert(err.message); }
-}
+        async function recordWaste() {
+            try {
+                const binId = document.getElementById("binId").value;
+                const location = document.getElementById("location").value;
+                const wasteType = document.getElementById("wasteType").value;
+                const weight = document.getElementById("weight").value;
+                const collectorId = document.getElementById("collectorId").value;
 
-async function removeCollector() {
-    try {
-        const addr = document.getElementById("removeCollectorAddress").value;
-        const tx = await contract.removeCollector(addr);
-        await tx.wait();
-        alert("Collector Removed");
-    } catch (err) { alert(err.message); }
-}
+                const tx = await contract.recordWaste(
+                    binId, 
+                    location, 
+                    wasteType, 
+                    weight, 
+                    true, // Defaulting collection status to true for this demo
+                    collectorId
+                );
+                alert("Transaction sent! Hash: " + tx.hash);
+                await tx.wait();
+                alert("Waste Recorded Successfully!");
+                fetchRecordCount();
+            } catch (err) {
+                console.error(err);
+                alert("Error: " + err.reason || err.message);
+            }
+        }
 
-async function recordWaste() {
-    try {
-        const binId = parseInt(document.getElementById("binId").value);
-        const location = document.getElementById("location").value;
-        const wasteType = parseInt(document.getElementById("wasteType").value);
-        const weight = parseInt(document.getElementById("weight").value);
-        const collectionStatus =
-            document.getElementById("collectionStatus").value === "true";
-        const collectorId = parseInt(document.getElementById("collectorId").value);
+        async function manageCollector(isAdding) {
+            try {
+                const addr = document.getElementById("collectorAddr").value;
+                const tx = isAdding ? await contract.addCollector(addr) : await contract.removeCollector(addr);
+                alert("Processing...");
+                await tx.wait();
+                alert("Collector Status Updated!");
+            } catch (err) {
+                console.error(err);
+                alert("Admin only or invalid address.");
+            }
+        }
 
-        const tx = await contract.recordWaste(
-            binId,
-            location,
-            wasteType,
-            weight,
-            collectionStatus,
-            collectorId
-        );
-
-        await tx.wait();
-        alert("Waste Recorded Successfully");
-        loadRecords();
-    } catch (err) { alert(err.message); }
-}
-
-async function loadRecords() {
-    const count = await contract.getRecordCount();
-    const table = document.getElementById("recordsTable");
-    table.innerHTML = "";
-
-    for (let i = 0; i < count; i++) {
-        const record = await contract.records(i);
-
-        const row = `<tr>
-            <td>${record.binId}</td>
-            <td>${record.location}</td>
-            <td>${new Date(record.timestamp * 1000).toLocaleString()}</td>
-            <td>${wasteTypes[record.wasteType]}</td>
-            <td>${record.weight}</td>
-            <td>${record.collectionStatus ? "Collected" : "Pending"}</td>
-            <td>${record.collectorId}</td>
-        </tr>`;
-
-        table.innerHTML += row;
-    }
-}
-
-function listenToEvents() {
-    contract.on("WasteRecorded", () => {
-        loadRecords();
-    });
-}
-</script>
-
+        async function fetchRecordCount() {
+            if (!contract) return;
+            const count = await contract.getRecordCount();
+            document.getElementById("recordCount").innerText = count.toString();
+        }
+    </script>
 </body>
 </html>
